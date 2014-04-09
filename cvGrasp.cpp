@@ -77,7 +77,7 @@ int cvGrasp :: prepareData()
 	stat = _dp.initialize(_cfg);
 	if(stat) return stat;
 
-	stat = _dp.prepare();
+	stat = _dp.getGraspImgFromAnnotation();
 	if(stat) return stat;
 
 	return 0;

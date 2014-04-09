@@ -14,6 +14,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <map>
 #include <string>
 #include <iomanip>
 
@@ -22,6 +23,20 @@
 #include "commonUse.hpp"
 using namespace std;
 using namespace cv;
+
+struct Action{
+  int startFrame;
+  int endFrame;
+  int graspFrame;
+  string verb;
+  vector<string> names;
+  void removeBadChars();
+  void makeAllCharsSmall();
+  void print() const;
+  string getActionName() const;
+};
+
+vector<Action> readActionAnnotations(const char * filename);
 
 class DataPreparation
 {
@@ -32,23 +47,16 @@ public:
 	string _rootname;
 	vector<string> _videoname;
 	double _thresPalm;
+	map<int, Action> _actions;
 
 	DataPreparation() {}
 	int initialize(ConfigFile &cfg);
 	int prepare();
+	int getGraspImgFromAnnotation();
 private:
-/*	double getRelevance(vector<Point> contour, int index, double perimeter);
-	bool isBlocked(vector<Point> contour, int index);
-	void curveEvolution(vector<Point> &contourDCE, const double maxValue, const int minNum);
-	void findConvex(vector<Point> list, vector<Point> &convex, vector<Point> &concave);
-	void prunConvex(vector<Point> &convex, vector<Point> &concave, const double thres);
-	void markContourPartition(vector<Point> contour, vector<Point> convex, Mat &mark);
-	void visualizeEndPoint(Mat &img, vector<Point> convex, Rect box);
-	void visualizeMark(Mat &img, Mat &mark, vector<Point> contour, Rect box);
-	void checkSkeletonPoint(Point center, Mat &dt, Mat &labels, vector<Point> &label_contour, Mat &skeleton, Mat &mark);
-	void skeletonize(Mat &dt, Mat &labels, vector<Point> boundary, Point maxLoc, Mat &skeleton);
-*/	int getContourBig(Mat src, Mat &dst, double thres, vector<vector<Point> > &co, int &idx);
+	int getContourBig(Mat src, Mat &dst, double thres, vector<vector<Point> > &co, int &idx);
 	int findPalm(Mat &p_hand, Point &anchor, Rect &box, Mat &eigenvectors, double segmentThres);
+	vector<Action> getActions(int seqNumber);
 };
 
 
