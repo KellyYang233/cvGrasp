@@ -12,100 +12,108 @@
 #include "DataPreparation.hpp"
 
 /*****************************************************************************************/
-void Action::removeBadChars(){
-  for(int i = 0; i < verb.length(); i++)
-    if(verb[i] == ' ' || verb[i] == '-')
-      verb[i] = '_';
-  for(int o = 0; o < names.size(); o++)
-    for(int i = 0; i < names[o].length(); i++)
-      if(names[o][i] == ' ' || names[o][i] == '-')
-	names[o][i] = '_';
-  return;
+void Action::removeBadChars()
+{
+	for(int i = 0; i < (int)verb.length(); i++)
+		if(verb[i] == ' ' || verb[i] == '-')
+			verb[i] = '_';
+	for(int o = 0; o < (int)names.size(); o++)
+		for(int i = 0; i < (int)names[o].length(); i++)
+			if(names[o][i] == ' ' || names[o][i] == '-')
+				names[o][i] = '_';
+	return;
 }
 
 /*****************************************************************************************/
-void Action::makeAllCharsSmall(){
-  for(int i = 0; i < verb.length(); i++)
-    if(verb[i] >= 'A' && verb[i] <= 'Z')
-      verb[i] = verb[i] + 'a' - 'A';
-  for(int o = 0; o < names.size(); o++)
-    for(int i = 0; i < names[o].length(); i++)
-      if(names[o][i] >= 'A' && names[o][i] <= 'Z')
-	names[o][i] = names[o][i] + 'a' - 'A';
-  return;  
+void Action::makeAllCharsSmall()
+{
+	for(int i = 0; i < (int)verb.length(); i++)
+		if(verb[i] >= 'A' && verb[i] <= 'Z')
+			verb[i] = verb[i] + 'a' - 'A';
+	for(int o = 0; o < (int)names.size(); o++)
+		for(int i = 0; i < (int)names[o].length(); i++)
+			if(names[o][i] >= 'A' && names[o][i] <= 'Z')
+				names[o][i] = names[o][i] + 'a' - 'A';
+	return;
 }
 
 /*****************************************************************************************/
-string Action::getActionName() const{
-  string output("");
-  output.append("<");
-  output.append(verb);
-  output.append("><");
-  for(int i = 0; i < names.size()-1; i++){
-    output.append(names[i]);
-    output.append(",");
-  }
-  output.append(names[names.size()-1]);
-  output.append(">");
-    
-  return output;
+string Action::getActionName() const
+{
+	string output("");
+	output.append("<");
+	output.append(verb);
+	output.append("><");
+	for(int i = 0; i < (int)names.size()-1; i++)
+	{
+		output.append(names[i]);
+		output.append(",");
+	}
+	output.append(names[names.size()-1]);
+	output.append(">");
+
+	return output;
 }
 
 /*****************************************************************************************/
-void Action::print() const{
-  cout << getActionName().c_str();
-  cout.flush();
-  return;
+void Action::print() const
+{
+	cout << getActionName().c_str();
+	cout.flush();
+	return;
 }
 
 
 /*****************************************************************************************/
-vector<Action> readActionAnnotations(const char * filename){
-  vector<Action> actions;
-  
-  ifstream infile(filename, ios::in);
-  int limit = 500;
-  char line[limit];
-  while(infile){
-    line[0] = 0;
-    infile.getline(line, limit);
-    if(!infile)
-      break;
-	
-    Action tempAction;
-    char * tier = strtok(line, "\t");
-    char * startFrame = strtok(NULL, "\t");
-	tempAction.startFrame = atoi(startFrame);
-    char * endFrame = strtok(NULL, "\t");
-	tempAction.endFrame = atoi(endFrame);
-    char * action = strtok(NULL, "\t");
-	char * graspFrame = strtok(NULL, "\t");
-	tempAction.graspFrame = atoi(graspFrame);
-    char * actionVerb = strtok(action, "(");
-    tempAction.verb = string(actionVerb);
-    char * actionNames = strtok(NULL, ")");
+vector<Action> readActionAnnotations(const char * filename)
+{
+	vector<Action> actions;
 
-    char * name = strtok(actionNames, ",");
-    while(name != NULL){
-      string namestr(name);
-      while(namestr[0] == ' '){
-		namestr = namestr.substr(1);
-		if(namestr.length() < 1)
-	  		break;
-      }
-      tempAction.names.push_back(namestr);
-      if(tempAction.names.size() >= 3)
-		break;
-      name = strtok(NULL, ",");
-    }
+	ifstream infile(filename, ios::in);
+	int limit = 500;
+	char line[limit];
+	while(infile)
+	{
+		line[0] = 0;
+		infile.getline(line, limit);
+		if(!infile)
+			break;
+		cout << "read line: " << line << endl;
+		Action tempAction;
+		char * tier = strtok(line, "\t");
+		char * startFrame = strtok(NULL, "\t");
+		tempAction.startFrame = atoi(startFrame);
+		char * endFrame = strtok(NULL, "\t");
+		tempAction.endFrame = atoi(endFrame);
+		char * action = strtok(NULL, "\t");
+		char * graspFrame = strtok(NULL, "\t");
+		tempAction.graspFrame = atoi(graspFrame);
+		char * actionVerb = strtok(action, "(");
+		tempAction.verb = string(actionVerb);
+		char * actionNames = strtok(NULL, ")");
+cout << "analyze object name: " << actionNames << endl;
+		char * name = strtok(actionNames, ",");
+		while(name != NULL)
+		{
+			string namestr(name);
+			while(namestr[0] == ' ')
+			{
+				namestr = namestr.substr(1);
+				if(namestr.length() < 1)
+					break;
+			}
+			tempAction.names.push_back(namestr);
+			if(tempAction.names.size() >= 3)
+				break;
+			name = strtok(NULL, ",");
+		}
+		tempAction.removeBadChars();
+		tempAction.makeAllCharsSmall();
+		actions.push_back(tempAction);
+	}
 
-    tempAction.removeBadChars();
-    tempAction.makeAllCharsSmall();
-    actions.push_back(tempAction);
-  }
-
-  infile.close();
-  return actions;
+	infile.close();
+	return actions;
 }
 
 int DataPreparation::getContourBig(Mat src, Mat &dst, double thres, vector<vector<Point> > &co, int &idx)
@@ -140,72 +148,72 @@ int DataPreparation::getContourBig(Mat src, Mat &dst, double thres, vector<vecto
 int DataPreparation::findPalm(Mat &p_hand, Point &anchor, Rect &box, Mat &eigenvectors, double segmentThres)
 {
 	int stat = 0;
-        int idx;
-        vector<vector<Point> > co;
-        Mat binary;
-        //check if there is hand with high confidence, and select the biggest contour
-        stat = getContourBig(p_hand, binary, segmentThres, co, idx);
+	int idx;
+	vector<vector<Point> > co;
+	Mat binary;
+	//check if there is hand with high confidence, and select the biggest contour
+	stat = getContourBig(p_hand, binary, segmentThres, co, idx);
 	if(stat != 0) return -1;
 
-        //2. calculate mean and covariance matrix for thresholded hand probability map
-        Moments moment = moments(binary, true);
-        Point dist_mean(moment.m10/moment.m00, moment.m01/moment.m00);
-        Mat cov(2, 2, CV_32FC1);
-        cov.at<float>(0, 0) = moment.mu20/moment.m00;
-        cov.at<float>(0, 1) = moment.mu11/moment.m00;
-        cov.at<float>(1, 0) = moment.mu11/moment.m00;
-        cov.at<float>(1, 1) = moment.mu02/moment.m00;
+	//2. calculate mean and covariance matrix for thresholded hand probability map
+	Moments moment = moments(binary, true);
+	Point dist_mean(moment.m10/moment.m00, moment.m01/moment.m00);
+	Mat cov(2, 2, CV_32FC1);
+	cov.at<float>(0, 0) = moment.mu20/moment.m00;
+	cov.at<float>(0, 1) = moment.mu11/moment.m00;
+	cov.at<float>(1, 0) = moment.mu11/moment.m00;
+	cov.at<float>(1, 1) = moment.mu02/moment.m00;
 	//3. choose eigenvector of covariance matrix with biggest eigenvalue as principle axis
-        Mat eigenvalues;
-        eigen(cov, eigenvalues, eigenvectors);
+	Mat eigenvalues;
+	eigen(cov, eigenvalues, eigenvectors);
 
-        //4. find anchor point using principle axis
-        vector<int> hull;
-        convexHull(co[idx], hull, true, false);
+	//4. find anchor point using principle axis
+	vector<int> hull;
+	convexHull(co[idx], hull, true, false);
 
-        double dotMax = FLT_MAX;
-        int hullIdx = -1;
-        for(int j = 0; j < (int)hull.size(); j++)
-        {
-                double dotProduct = co[idx][hull[j]].x*eigenvectors.at<float>(0,0) + co[idx][hull[j]].y*eigenvectors.at<float>(0,1);
-                if(dotProduct < dotMax)
-                {
-                        dotMax = dotProduct;
-                        hullIdx = j;
-                }
-        }
-        if(-1 != hullIdx) anchor = co[idx][hull[hullIdx]];
-        else
-        {
-                cout << "ERROR anchor index!\n";
-                return -1;
-        }
+	double dotMax = FLT_MAX;
+	int hullIdx = -1;
+	for(int j = 0; j < (int)hull.size(); j++)
+	{
+		double dotProduct = co[idx][hull[j]].x*eigenvectors.at<float>(0,0) + co[idx][hull[j]].y*eigenvectors.at<float>(0,1);
+		if(dotProduct < dotMax)
+		{
+			dotMax = dotProduct;
+			hullIdx = j;
+		}
+	}
+	if(-1 != hullIdx) anchor = co[idx][hull[hullIdx]];
+	else
+	{
+		cout << "ERROR anchor index!\n";
+		return -1;
+	}
 
 	box = boundingRect(co[idx]);
 	return 0;
 
 
-        //bounding box 240*240 based on anchor point and dist_mean point
-        if(anchor.x < dist_mean.x && anchor.y < dist_mean.y)
-        {
-                box = Rect(anchor.x-80, anchor.y-80, 240, 240);
-        }
-        if(anchor.x < dist_mean.x && anchor.y >= dist_mean.y)
-        {
-                box = Rect(anchor.x-80, anchor.y-160, 240, 240);
-        }
-        if(anchor.x >= dist_mean.x && anchor.y >= dist_mean.y)
-        {
-                box = Rect(anchor.x-160, anchor.y-160, 240, 240);
-        }
-        if(anchor.x >= dist_mean.x && anchor.y < dist_mean.y)
-        {
-                box = Rect(anchor.x-160, anchor.y-80, 240, 240);
-        }
-        if(box.x < 0) box.x = 0;
-        if(box.y < 0) box.y = 0;
-        if(box.x + box.width > p_hand.cols) box.x = p_hand.cols - box.width;
-        if(box.y + box.height > p_hand.rows) box.y = p_hand.rows - box.height;
+	//bounding box 240*240 based on anchor point and dist_mean point
+	if(anchor.x < dist_mean.x && anchor.y < dist_mean.y)
+	{
+		box = Rect(anchor.x-80, anchor.y-80, 240, 240);
+	}
+	if(anchor.x < dist_mean.x && anchor.y >= dist_mean.y)
+	{
+		box = Rect(anchor.x-80, anchor.y-160, 240, 240);
+	}
+	if(anchor.x >= dist_mean.x && anchor.y >= dist_mean.y)
+	{
+		box = Rect(anchor.x-160, anchor.y-160, 240, 240);
+	}
+	if(anchor.x >= dist_mean.x && anchor.y < dist_mean.y)
+	{
+		box = Rect(anchor.x-160, anchor.y-80, 240, 240);
+	}
+	if(box.x < 0) box.x = 0;
+	if(box.y < 0) box.y = 0;
+	if(box.x + box.width > p_hand.cols) box.x = p_hand.cols - box.width;
+	if(box.y + box.height > p_hand.rows) box.y = p_hand.rows - box.height;
 
 	return 0;
 }
@@ -283,7 +291,7 @@ int DataPreparation :: prepare()
 {
 	//initialize() should be called before
 	assert((size_t)_videoname.size() > 0);
-	
+
 	int stat;
 	string dirCode; //name of base directory
 	stringstream ss;
@@ -371,7 +379,7 @@ int DataPreparation :: prepare()
 			Point minLoc, maxLoc;
 			distanceTransform(palm_b, palm_dt, CV_DIST_L2, CV_DIST_MASK_PRECISE);
 			minMaxLoc(palm_dt, &minVal, &maxVal, NULL, &maxLoc);
-			 
+
 			//select biggest area after thresholding distance transform map
 			getContourBig(palm_dt, palm_b, maxVal/2, co, idx);
 
@@ -406,7 +414,7 @@ int DataPreparation :: prepare()
 				for(int col = 0; col < hand_roi.cols; col++)
 				{
 					uchar* ptr = hand_roi.ptr(row);
-					*(ptr+col*3+1) = *(ptr+col*3+2) = *(ptr+col*3); 
+					*(ptr+col*3+1) = *(ptr+col*3+2) = *(ptr+col*3);
 				}
 
 			ss.str("");
@@ -428,7 +436,7 @@ int DataPreparation :: prepare()
 			imwrite(ss.str(), color);
 			Mat color_roi(box.height, box.width, color.type());
 			color(box).copyTo(color_roi);
-	
+
 			ss.str("");
 			ss << "sample: " << framenum;
 			ss.str("");
@@ -451,15 +459,15 @@ int DataPreparation :: prepare()
 
 vector<Action> DataPreparation::getActions(int seqNumber)
 {
-  	vector<Action> seqActions;
-  	string seqName = _videoname[seqNumber];
+	vector<Action> seqActions;
+	string seqName = _videoname[seqNumber];
 
-    char filename[500];
-    filename[0] = 0;
-    sprintf(filename, "%s/annotation/T_%s.txt", _rootname.c_str(), seqName.c_str());
-    seqActions = readActionAnnotations(filename);
+	char filename[500];
+	filename[0] = 0;
+	sprintf(filename, "%s/annotation/T_%s.txt", _rootname.c_str(), seqName.c_str());
+	seqActions = readActionAnnotations(filename);
 
-  	return seqActions;
+	return seqActions;
 }
 
 int DataPreparation::getHandRegion(int seqNumber, int framenum, Mat &anchorPoint)
@@ -513,7 +521,7 @@ int DataPreparation::getHandRegion(int seqNumber, int framenum, Mat &anchorPoint
 	Point minLoc, maxLoc;
 	distanceTransform(palm_b, palm_dt, CV_DIST_L2, CV_DIST_MASK_PRECISE);
 	minMaxLoc(palm_dt, &minVal, &maxVal, NULL, &maxLoc);
-	 
+
 	//select biggest area after thresholding distance transform map
 	getContourBig(palm_dt, palm_b, maxVal/2, co, idx);
 
@@ -524,7 +532,7 @@ int DataPreparation::getHandRegion(int seqNumber, int framenum, Mat &anchorPoint
 	palm_center.y += box.y;
 
 	//save manipulation points and palm center
-	
+
 	anchorPoint.at<float>(0, 0) = anchor.x;
 	anchorPoint.at<float>(0, 1) = anchor.y;
 	anchorPoint.at<float>(0, 2) = palm_center.x;
@@ -535,7 +543,7 @@ int DataPreparation::getHandRegion(int seqNumber, int framenum, Mat &anchorPoint
 	anchorPoint.at<float>(0, 7) = bounding.y;
 	anchorPoint.at<float>(0, 8) = bounding.width;
 	anchorPoint.at<float>(0, 9) = bounding.height;
-	
+
 	return 0;
 }
 
@@ -543,7 +551,7 @@ int DataPreparation::getGraspImgFromAnnotation()
 {
 	//initialize() should be called before
 	assert((size_t)_videoname.size() > 0);
-	
+
 	int stat;
 	string dirCode; //name of base directory
 	stringstream ss;
@@ -584,10 +592,11 @@ int DataPreparation::getGraspImgFromAnnotation()
 	ss << _rootname + "/grasp/" + dirCode + "/source/frameid.txt";
 	ofstream outfile(ss.str().c_str());
 	int framenum = 0;
-	for(int v = 0; v < _videoname.size(); v++)
+	for(int v = 0; v < (int)_videoname.size(); v++)
 	{
 		vector<Action> seqActions = getActions(v);
-		for(int a = 0; a < seqActions.size(); a++)
+		cout << "read action annotation in sequence: " << _videoname[v] << endl;
+		for(int a = 0; a < (int)seqActions.size(); a++)
 		{
 			int frameid = seqActions[a].graspFrame;
 			Mat anchorPoint(1, 10, CV_32FC1);
@@ -599,7 +608,7 @@ int DataPreparation::getGraspImgFromAnnotation()
 			ss.str("");
 			ss << _videoname[v] << "\t" << frameid << "\t" << framenum << endl;
 			outfile << ss.str();
-			
+
 			//read hand probability image
 			ss.str("");
 			ss << _rootname + "/hand/" + _videoname[v] + "/";
@@ -623,7 +632,7 @@ int DataPreparation::getGraspImgFromAnnotation()
 				for(int col = 0; col < hand_roi.cols; col++)
 				{
 					uchar* ptr = hand_roi.ptr(row);
-					*(ptr+col*3+1) = *(ptr+col*3+2) = *(ptr+col*3); 
+					*(ptr+col*3+1) = *(ptr+col*3+2) = *(ptr+col*3);
 				}
 
 			ss.str("");
@@ -659,7 +668,6 @@ int DataPreparation::getGraspImgFromAnnotation()
 	FileStorage fs;
 	fs.open(ss.str(), FileStorage::WRITE);
 	fs << string("anchor") << anchorPoints;
-	fs.close();
 	outfile.close();
 
 	return 0;

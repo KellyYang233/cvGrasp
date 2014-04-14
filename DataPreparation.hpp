@@ -56,6 +56,7 @@ public:
 private:
 	int getContourBig(Mat src, Mat &dst, double thres, vector<vector<Point> > &co, int &idx);
 	int findPalm(Mat &p_hand, Point &anchor, Rect &box, Mat &eigenvectors, double segmentThres);
+	int getHandRegion(int seqNumber, int framenum, Mat &anchorPoint);
 	vector<Action> getActions(int seqNumber);
 };
 
