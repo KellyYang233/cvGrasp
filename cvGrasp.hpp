@@ -42,6 +42,7 @@ public:
 	int prepareData();
 	int computeFeature();
 	int hierarchyCluster();
+	int procIntelGrasp();
 private:
 };
 

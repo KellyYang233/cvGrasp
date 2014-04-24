@@ -29,6 +29,7 @@ using namespace std;
 
 enum error_t
 {
+	ERR_CONTINUE = 1,
 	ERR_CLI_PARAM = 1000,
 	ERR_CLI_PARAM_INVALID,
 	ERR_CLI_VALUE_INVALID,

@@ -24,6 +24,12 @@
 using namespace std;
 using namespace cv;
 
+#define INTEL_OBJECT_SIZE 42
+#define HAND_L 1
+#define HAND_R 2
+#define HAND_LR 4
+#define HAND_ITS 8
+
 struct Action{
   int startFrame;
   int endFrame;
@@ -36,7 +42,18 @@ struct Action{
   string getActionName() const;
 };
 
+struct HandInfo{
+	int seqNum;
+	int frameNum;
+	int objectId;
+	int handState;
+	Rect box[2];
+	Point center[2];
+	float angle[2];
+}
+
 vector<Action> readActionAnnotations(const char * filename);
+vector<int> readObjectAnnotations(const char * filename);
 
 class DataPreparation
 {
@@ -48,16 +65,20 @@ public:
 	vector<string> _videoname;
 	double _thresPalm;
 	map<int, Action> _actions;
+	vector<vector<HandInfo> > _handInfo;
 
 	DataPreparation() {}
 	int initialize(ConfigFile &cfg);
 	int prepare();
-	int getGraspImgFromAnnotation();
+	int getGraspFromGTEA();
+	int getGraspFromIntel();
 private:
 	int getContourBig(Mat src, Mat &dst, double thres, vector<vector<Point> > &co, int &idx);
 	int findPalm(Mat &p_hand, Point &anchor, Rect &box, Mat &eigenvectors, double segmentThres);
-	int getHandRegion(int seqNumber, int framenum, Mat &anchorPoint);
-	vector<Action> getActions(int seqNumber);
+	int getHandRegion(string seqName, int framenum, Mat &anchorPoint);
+	int getHandInfo(string seqName, int framenum, HandInfo &hInfo);
+	vector<Action> getActions(string seqName);
+	vector<int> getObjects(string seqName);
 };
 
 

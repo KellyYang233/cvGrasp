@@ -77,7 +77,7 @@ int cvGrasp :: prepareData()
 	stat = _dp.initialize(_cfg);
 	if(stat) return stat;
 
-	stat = _dp.getGraspImgFromAnnotation();
+	stat = _dp.getGraspFromGTEA();
 	if(stat) return stat;
 
 	return 0;
@@ -118,6 +118,18 @@ int cvGrasp :: hierarchyCluster()
 	stat = _hc.cluster(_workDir, _featureType);
 	if(stat) return stat;
 
+	return 0;
+}
+
+int cvGrasp::procIntelGrasp()
+{
+	int stat = 0;
+
+	stat = _dp.initialize(_cfg);
+	if(stat) return stat;
+
+	stat = _dp.getGraspFromIntel();
+	if(stat) return stat; 
 	return 0;
 }
 
@@ -165,8 +177,9 @@ int main(int argc, char** argv)
 	{
 		stat = grasp.hierarchyCluster();
 	}
-	else if("all" == operation)
+	else if("intel" == operation)
 	{
+		stat = grasp.procIntelGrasp();
 	}
 	else
 	{
