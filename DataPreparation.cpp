@@ -893,8 +893,17 @@ int DataPreparation::getGraspFromIntel()
 		cout << ss.str() << endl;
 		system(ss.str().c_str());
 
+		ss.str("");
+		ss << _rootname + "/grasp/" + dirCode + "/object-" << i+1 << "/log.txt";
+		ofstream outfile(ss.str().c_str(), ios::out);
 		for(int j = 0; j < (int)_handInfo[i].size(); j++)
 		{
+			ss.str("");
+			ss << _handInfo[i][j].seqNum << "\t" << _handInfo[i][j].frameNum << "\t" << _handInfo[i][j].handState << "\t";
+			ss << "(" << _handInfo[i][j].box[0].x << "," << _handInfo[i][j].box[0].y << "," << _handInfo[i][j].box[0].width << "," << _handInfo[i][j].box[0].height << ")\t";
+			ss << "(" << _handInfo[i][j].box[1].x << "," << _handInfo[i][j].box[1].y << "," << _handInfo[i][j].box[1].width << "," << _handInfo[i][j].box[1].height << ")\n";
+			outfile << ss.str();
+			
 			ss.str("");
 			ss << _rootname + "/img/Egocentric_Objects_Intel/no" << _handInfo[i][j].seqNum << "/";
 			ss << setw(10) << setfill('0') << _handInfo[i][j].frameNum << ".jpg";
@@ -961,6 +970,7 @@ int DataPreparation::getGraspFromIntel()
 			}
 			
 		}
+		outfile.close();
 	}
 
 	return 0;
