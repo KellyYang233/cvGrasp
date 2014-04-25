@@ -50,10 +50,10 @@ struct HandInfo{
 	Rect box[2];
 	Point center[2];
 	float angle[2];
-}
+};
 
-vector<Action> readActionAnnotations(const char * filename);
-vector<int> readObjectAnnotations(const char * filename);
+vector<Action> readActionAnnotations(const char* filename);
+vector<int> readObjectAnnotations(const char* filename);
 
 class DataPreparation
 {
@@ -74,6 +74,7 @@ public:
 	int getGraspFromIntel();
 private:
 	int getContourBig(Mat src, Mat &dst, double thres, vector<vector<Point> > &co, int &idx);
+	int getContours(Mat &src, double thres, vector<vector<Point> > &contours);
 	int findPalm(Mat &p_hand, Point &anchor, Rect &box, Mat &eigenvectors, double segmentThres);
 	int getHandRegion(string seqName, int framenum, Mat &anchorPoint);
 	int getHandInfo(string seqName, int framenum, HandInfo &hInfo);

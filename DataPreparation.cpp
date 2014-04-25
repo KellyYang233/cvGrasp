@@ -186,7 +186,7 @@ int DataPreparation::getContours(Mat &src, double thres, vector<vector<Point> > 
 		areaRegion[-area] = c;
 	}
 
-	count = areaRegion.size();
+	int count = (int)areaRegion.size();
 	if(0 == count)
 		return -1;
 	for(map<float, int>::iterator it = areaRegion.begin(); it != areaRegion.end(); it++)
@@ -384,7 +384,7 @@ int DataPreparation :: prepare()
 		for(int f = _startframe; f <= _endframe; f += _interval)
 		{
 			Mat anchorPoint(1, 10, CV_32FC1);
-			stat = getHandRegion(v, f , anchorPoint);
+			stat = getHandRegion(_videoname[v], f , anchorPoint);
 			if(stat)
 				continue;
 			anchorPoints.push_back(anchorPoint);
@@ -405,6 +405,7 @@ int DataPreparation :: prepare()
 			ss << _rootname + "/grasp/" + dirCode + "/source/hand/";
 			ss << setw(8) << setfill('0') << framenum << "_hand.jpg";
 			imwrite(ss.str(), hand);
+			Rect box = Rect(anchorPoint.at<float>(0,6), anchorPoint.at<float>(0,7), anchorPoint.at<float>(0,8),anchorPoint.at<float>(0,9));
 			Mat hand_roi(box.height, box.width, hand.type());
 			hand(box).copyTo(hand_roi);
 			for(int row = 0; row < hand_roi.rows; row++)
@@ -591,7 +592,7 @@ int DataPreparation::getHandInfo(string seqName, int framenum, HandInfo &hInfo)
 	if((int)contours.size() == 1)
 	{
 		RotatedRect rRect = fitEllipse(contours[0]);
-		Rect box = boundingRect(contour[0]);
+		Rect box = boundingRect(contours[0]);
 		if(box.width > p_hand.cols/2.0 || box.height > p_hand.rows/2.0)
 			hInfo.handState = HAND_ITS;
 		else if(rRect.center.x < p_hand.cols/2.0)
@@ -605,9 +606,9 @@ int DataPreparation::getHandInfo(string seqName, int framenum, HandInfo &hInfo)
 	else
 	{
 		RotatedRect rRect1 = fitEllipse(contours[0]);
-		Rect box1 = boundingRect(contour[0]);
+		Rect box1 = boundingRect(contours[0]);
 		RotatedRect rRect2 = fitEllipse(contours[1]);
-		Rect box2 = boundingRect(contour[1]);
+		Rect box2 = boundingRect(contours[1]);
 
 		bool isXSec = false;
 		bool isYSec = false;
@@ -656,7 +657,7 @@ int DataPreparation::getHandInfo(string seqName, int framenum, HandInfo &hInfo)
 		}		
 			
 	}
-	
+	return 0;	
 }
 
 int DataPreparation::getGraspFromGTEA()
@@ -829,6 +830,7 @@ int DataPreparation::getGraspFromIntel()
 			
 			_handInfo[hInfo.objectId-1].push_back(hInfo);
 		}
+		cout << "finish reading data from sequence: " << ss.str() << endl;
 	}
 
 	for(int i = 0; i < INTEL_OBJECT_SIZE; i++)
@@ -846,7 +848,7 @@ int DataPreparation::getGraspFromIntel()
 		for(int j = 0; j < (int)_handInfo[i].size(); j++)
 		{
 			ss.str("");
-			ss << _rootname + "/img/Egocentric_Objects_Intel/no" << _handInfo[i][j].seqNum + "/";
+			ss << _rootname + "/img/Egocentric_Objects_Intel/no" << _handInfo[i][j].seqNum << "/";
 			ss << setw(10) << setfill('0') << _handInfo[i][j].frameNum << ".jpg";
 			Mat img = imread(ss.str());
 			if(!img.data)
@@ -887,7 +889,7 @@ int DataPreparation::getGraspFromIntel()
 				imwrite(ss.str(), img_roi1);
 
 				Mat img_roi2(_handInfo[i][j].box[1].height, _handInfo[i][j].box[1].width, img.type());
-				img(_handInfo[i][j].box[1]).copyTo(img_roi);
+				img(_handInfo[i][j].box[1]).copyTo(img_roi2);
 
 				ss.str("");
 				ss << _rootname + "/grasp/" + dirCode + "/object-" << i+1 << "/R_";
@@ -912,5 +914,7 @@ int DataPreparation::getGraspFromIntel()
 			
 		}
 	}
+
+	return 0;
 }
 
