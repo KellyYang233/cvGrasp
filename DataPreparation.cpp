@@ -927,8 +927,8 @@ int DataPreparation::getGraspFromIntel()
 			}
 			else if(_handInfo[i][j].handState == HAND_R)
 			{
-				Mat img_roi(_handInfo[i][j].box[1].height, _handInfo[i][j].box[1].width, img.type());
-				img(_handInfo[i][j].box[1]).copyTo(img_roi);
+				Mat img_roi(_handInfo[i][j].box[0].height, _handInfo[i][j].box[0].width, img.type());
+				img(_handInfo[i][j].box[0]).copyTo(img_roi);
 
 				ss.str("");
 				ss << _rootname + "/grasp/" + dirCode + "/object-" << i+1 << "/R_";
