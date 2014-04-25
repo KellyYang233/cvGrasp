@@ -52,8 +52,14 @@ struct HandInfo{
 	float angle[2];
 };
 
+struct TrackInfo{
+	int trackNum;
+	vector<RotatedRect> rRects;
+};
+
 vector<Action> readActionAnnotations(const char* filename);
 vector<int> readObjectAnnotations(const char* filename);
+vector<TrackInfo> readTrackLog(const char* filename);
 
 class DataPreparation
 {
@@ -77,9 +83,10 @@ private:
 	int getContours(Mat &src, double thres, vector<vector<Point> > &contours);
 	int findPalm(Mat &p_hand, Point &anchor, Rect &box, Mat &eigenvectors, double segmentThres);
 	int getHandRegion(string seqName, int framenum, Mat &anchorPoint);
-	int getHandInfo(string seqName, int framenum, HandInfo &hInfo);
-	vector<Action> getActions(string seqName);
-	vector<int> getObjects(string seqName);
+	int getHandInfo(string seqName, int framenum, TrackInfo handTrack, HandInfo &hInfo);
+	void getActions(string seqName, vector<Action> &seqActions);
+	void getObjects(string seqName, vector<int> &objects);
+	void getTrackedHand(string seqName, vector<TrackInfo> &tracks);
 };
 
 

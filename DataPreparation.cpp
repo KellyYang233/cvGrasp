@@ -65,7 +65,7 @@ void Action::print() const
 
 
 /*****************************************************************************************/
-vector<Action> readActionAnnotations(const char * filename)
+vector<Action> readActionAnnotations(const char* filename)
 {
 	vector<Action> actions;
 
@@ -117,10 +117,9 @@ cout << "analyze object name: " << actionNames << endl;
 }
 
 /*****************************************************************************************/
-vector<int> readObjectAnnotations(const char * filename)
+vector<int> readObjectAnnotations(const char* filename)
 {
 	vector<int> objects;
-
 	ifstream infile(filename, ios::in);
 	int limit = 500;
 	char line[limit];
@@ -136,6 +135,43 @@ vector<int> readObjectAnnotations(const char * filename)
 
 	infile.close();
 	return objects;
+}
+
+vector<TrackInfo> readTrackLog(const char* filename)
+{
+	vector<TrackInfo> tracks;
+	ifstream infile(filename, ios::in);
+	int limit = 500;
+	char line[limit];
+	while(infile)
+	{
+		line[0] = 0;
+		infile.getline(line, limit);
+		if(!infile)
+			break;
+		TrackInfo temp;
+		char* trackNum = strtok(line, "\t");
+		temp.trackNum = atoi(trackNum);
+		for(int i = 0; i < temp.trackNum; i++)
+		{
+			RotatedRect rRect;
+			char* centerX = strtok(NULL, "\t(,)");
+			rRect.center.x = atof(centerX);
+			char* centerY = strtok(NULL, "\t(,)");
+			rRect.center.y = atof(centerY);
+			char* axisL = strtok(NULL, "\t(,)");
+			rRect.size.width = atof(axisL);
+			char* axisS = strtok(NULL, "\t(,)");
+			rRect.size.height = atof(axisS);
+			char* angle = strtok(NULL, "\t(,)");
+			rRect.angle = atof(angle);
+			temp.rRects.push_back(rRect);
+		}
+		tracks.push_back(temp);
+	}
+	infile.close();
+
+	return tracks;
 }
 
 int DataPreparation::getContourBig(Mat src, Mat &dst, double thres, vector<vector<Point> > &co, int &idx)
@@ -455,28 +491,34 @@ int DataPreparation :: prepare()
 	return 0;
 }
 
-vector<Action> DataPreparation::getActions(string seqName)
+void DataPreparation::getActions(string seqName, vector<Action> &seqActions)
 {
-	vector<Action> seqActions;
-
 	char filename[500];
 	filename[0] = 0;
 	sprintf(filename, "%s/annotation/T_%s.txt", _rootname.c_str(), seqName.c_str());
 	seqActions = readActionAnnotations(filename);
 
-	return seqActions;
+	return;
 }
 
-vector<int> DataPreparation::getObjects(string seqName)
+void DataPreparation::getObjects(string seqName, vector<int> &objects)
 {
-	vector<int> objects;
-
 	char filename[500];
 	filename[0] = 0;
-	sprintf(filename, "%s/annotation/%s.txt", _rootname.c_str(), seqName.c_str());
+	sprintf(filename, "%s/annotation/%s_label.txt", _rootname.c_str(), seqName.c_str());
 	objects = readObjectAnnotations(filename);
 
-	return objects;
+	return;
+}
+
+void DataPreparation::getTrackedHand(string seqName, vector<TrackInfo> &tracks)
+{
+	char filename[500];
+	filename[0] = 0;
+	sprintf(filename, "%s/annotation/%s_track.txt", _rootname.c_str(), seqName.c_str());
+	tracks = readTrackLog(filename);
+
+	return;
 }
 
 int DataPreparation::getHandRegion(string seqName, int framenum, Mat &anchorPoint)
@@ -555,7 +597,7 @@ int DataPreparation::getHandRegion(string seqName, int framenum, Mat &anchorPoin
 	return 0;
 }
 
-int DataPreparation::getHandInfo(string seqName, int framenum, HandInfo &hInfo)
+int DataPreparation::getHandInfo(string seqName, int framenum, TrackInfo handTrack, HandInfo &hInfo)
 {
 	int stat = 0;
 	stringstream ss;
@@ -593,7 +635,7 @@ int DataPreparation::getHandInfo(string seqName, int framenum, HandInfo &hInfo)
 	{
 		RotatedRect rRect = fitEllipse(contours[0]);
 		Rect box = boundingRect(contours[0]);
-		if(box.width > p_hand.cols/2.0 || box.height > p_hand.rows/2.0)
+		if(handTrack.trackNum > 1)
 			hInfo.handState = HAND_ITS;
 		else if(rRect.center.x < p_hand.cols/2.0)
 			hInfo.handState = HAND_L;
@@ -707,7 +749,8 @@ int DataPreparation::getGraspFromGTEA()
 	int framenum = 0;
 	for(int v = 0; v < (int)_videoname.size(); v++)
 	{
-		vector<Action> seqActions = getActions(_videoname[v]);
+		vector<Action> seqActions;
+		getActions(_videoname[v], seqActions);
 		cout << "read action annotation in sequence: " << _videoname[v] << endl;
 		for(int a = 0; a < (int)seqActions.size(); a++)
 		{
@@ -810,7 +853,11 @@ int DataPreparation::getGraspFromIntel()
 	{
 		ss.str("");
 		ss << "Egocentric_Objects_Intel/no" << trainS[s];
-		vector<int> objectList = getObjects(ss.str());
+		vector<int> objectList;
+		getObjects(ss.str(), objectList); // read object label
+		vector<TrackInfo> handTracks;
+		getTrackedHand(ss.str(), handTracks); // read hand tracking log
+
 		for(int f = 0; f < (int)objectList.size(); f++)
 		{
 			HandInfo hInfo;
@@ -819,7 +866,7 @@ int DataPreparation::getGraspFromIntel()
 			if(objectList[f] == 0)
 				continue;
 			hInfo.objectId = objectList[f];
-			stat = getHandInfo(ss.str(), f+1, hInfo);
+			stat = getHandInfo(ss.str(), f+1, handTracks[f], hInfo);
 			if(stat)
 			{
 				if(stat == ERR_CONTINUE)
@@ -827,7 +874,8 @@ int DataPreparation::getGraspFromIntel()
 				else
 					break;
 			}
-			
+
+			// objectId begins from 1
 			_handInfo[hInfo.objectId-1].push_back(hInfo);
 		}
 		cout << "finish reading data from sequence: " << ss.str() << endl;
