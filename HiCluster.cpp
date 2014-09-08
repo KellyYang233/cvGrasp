@@ -6,8 +6,113 @@
  *  Copyright 2013 __MyCompanyName__. All rights reserved.
  *
  */
-
+#include <cassert>
 #include "HiCluster.hpp"
+
+float calcDissimilarity(FeatureInfo &F1, FeatureInfo &F2, vector<string> feature_set, vector<float> weight_set)
+{
+	float cost = 0;
+
+	for(int i = 0; i < (int)feature_set.size(); i++)
+	{
+		if("HOG" == feature_set[i])
+		{
+			cost += norm(F1.hog, F2.hog)*weight_set[i];
+		}
+		else if("EDGE" == feature_set[i])
+		{
+			if(F1.edge.size() != F2.edge.size())
+			{
+				cout << "calcDissimilarity: ERROR: size of edge map should be equal\n";
+				exit(1);
+			}
+			float sum1=0, sum2=0;
+			int c1=0, c2=0;
+			for(int r = 0; r < F1.edge.rows; r++)
+				for(int c = 0; c < F1.edge.cols; c++)
+				{
+					if(F1.edge.at<uchar>(r,c) > 0)
+					{
+						sum1 += F2.dt.at<float>(r,c);
+						c1++;
+					}
+					if(F2.edge.at<uchar>(r,c) > 0)
+					{
+						sum2 += F1.dt.at<float>(r,c);
+						c2++;
+					}
+				}
+			cost += (sum1/c1 + sum2/c2)*weight_set[i];
+					
+		}
+		else if("SHAPE" == feature_set[i])
+		{
+			cost += norm(F1.shape, F2.shape)*weight_set[i];
+		}
+		else
+		{
+			cout << "calcDissimilarity: WARNING: unrecognized feature type: " + feature_set[i] + "\n";
+		}
+	}
+	
+	return cost;
+}
+
+void getSpectralCluster(Mat &distMatrix, int K, Mat &labels, Mat &centers)
+{
+	assert(K > 1 && distMatrix.data);
+	//similarity matrix
+	Mat S = Mat::zeros(distMatrix.size(), CV_32FC1); 
+	for(int row = 0; row < S.rows; row++)
+	{
+		float sum_row = 0;
+		for(int k = 0; k < S.cols; k++)
+			sum_row += distMatrix.at<float>(row, k);
+		float std = sum_row / S.cols;
+//		cout << "standard deviation <row" << row << ">: " << std << endl;	
+		for(int col = row+1; col < S.cols; col++)
+		{
+			S.at<float>(row, col) = exp(pow(distMatrix.at<float>(row,col),2)*(-1)/2/pow(std,2));
+		}
+	}
+	for(int row = 0; row < S.rows; row++)
+		for(int col = 0; col < row; col++)
+			S.at<float>(row, col) = S.at<float>(col, row);
+
+	//diagonal matrix
+	Mat D = Mat::zeros(S.size(), CV_32FC1);
+	for(int i = 0; i < S.rows; i++)
+	{
+		float sum_row = 0;
+		for(int j = 0; j < S.cols; j++)
+		{
+			sum_row += S.at<float>(i,j);
+		}
+		D.at<float>(i, i) = 1 / sqrt(sum_row);
+	}
+
+	//normalized graph Laplacian
+	Mat L = D * S * D;
+	Mat eigenvectors;
+	vector<float> eigenvalues;
+	eigen(L, eigenvalues, eigenvectors);
+/*	for(int i = 0; i < (int)eigenvalues.size(); i++)
+	{
+		cout << eigenvalues[i] << " ";
+		if(i%10 == 9) cout << endl;
+	}
+*/
+	Mat samples(L.rows, K, CV_32FC1);
+	eigenvectors = eigenvectors.t();
+	eigenvectors.colRange(0, K).copyTo(samples);
+	for(int i = 0; i < samples.rows; i++)
+		normalize(samples.row(i), samples.row(i));
+
+	//kmeans clustering
+	kmeans(samples, K, labels, TermCriteria(CV_TERMCRIT_EPS+CV_TERMCRIT_ITER, 10, 0.1/K), 5, KMEANS_PP_CENTERS, centers);
+
+	return;
+}
 
 int HiCluster :: initialize(ConfigFile &cfg)
 {
@@ -19,6 +124,37 @@ int HiCluster :: initialize(ConfigFile &cfg)
 	{
 		return ERR_CFG_CLUSTER_NONEXIST;
 	}
+
+	if(cfg.keyExists("version"))
+	{
+		_version = cfg.getValueOfKey<int>("version");
+	}
+	else
+	{
+		return ERR_CFG_VERSION_NONEXIST;
+	}
+
+	if(cfg.keyExists("feature"))
+    {
+        string fCode = cfg.getValueOfKey<string>("feature");
+		cout << "features: " << fCode << endl;
+		//parse feature code and calculate corresponding feature cost
+		//element of feature code: (type, weight)
+		char* type = strtok((char*)fCode.c_str(), " ,;");
+		while(type != NULL)
+		{
+			_feature_set.push_back(string(type));
+			char* weight = strtok(NULL, " ,;");
+			if(weight == NULL)
+			{
+				cout << "HiCluster::initialize: WARNING: invalid feature configuration\n";
+				_feature_set.pop_back();
+				break;
+			}
+			_weight_set.push_back(atof(weight));
+			type = strtok(NULL, " ,;");
+		}
+    }
 
 	return 0;
 }
@@ -275,7 +411,7 @@ int HiCluster :: flatSpectralCluster(string workDir, vector<string> featureType)
 	_minIndex = vector<vector<int> >(0);
 	_levelTree = vector<vector<vector<int> > >(0);
 
-	Mat cost_G; //similarity matrix
+	Mat cost_G; //distance matrix
 	ss.str("");
 	ss << workDir + "/feature/" + featCode + "/feature.xml";
 	FileStorage ofs;
@@ -456,23 +592,23 @@ int HiCluster :: spectralCluster(string workDir, vector<string> featureType)
 	_minIndex = vector<vector<int> >(0);
 	_levelTree = vector<vector<vector<int> > >(0);
 	Mat cost_G; //similarity matrix
-		ss.str("");
-		ss << workDir + "/feature/" + featCode + "/feature.xml";
-		FileStorage ofs;
-		ofs.open(ss.str(), FileStorage::READ);
-		ofs[featCode] >> cost_G;
-		if(!cost_G.data)
-		{
-			return ERR_CLUSTER_FEATURE_NONEXIST;
-		}
+	ss.str("");
+	ss << workDir + "/feature/" + featCode + "/feature.xml";
+	FileStorage ofs;
+	ofs.open(ss.str(), FileStorage::READ);
+	ofs[featCode] >> cost_G;
+	if(!cost_G.data)
+	{
+		return ERR_CLUSTER_FEATURE_NONEXIST;
+	}
 
-		cout << "<" << featCode << "> save baselevel distance matrix, baselevel size: " << cost_G.rows << endl;
-		ss.str("");
-		ss << workDir + "/cluster/spectral/" + featCode + "/level_0_feature.xml";
-		FileStorage ifs;
-		ifs.open(ss.str(), FileStorage::WRITE);
-		ifs << featCode << cost_G;
-		ifs.release();
+	cout << "<" << featCode << "> save baselevel distance matrix, baselevel size: " << cost_G.rows << endl;
+	ss.str("");
+	ss << workDir + "/cluster/spectral/" + featCode + "/level_0_feature.xml";
+	FileStorage ifs;
+	ifs.open(ss.str(), FileStorage::WRITE);
+	ifs << featCode << cost_G;
+	ifs.release();
 
 	int baselevelSize = cost_G.rows;
 	//structure for storing prototype index
@@ -595,7 +731,7 @@ int HiCluster :: spectralCluster(string workDir, vector<string> featureType)
 		//restore the nearest neighbor grasp for later visualization
 		_minIndex.push_back(minIndex);
 
-		//save average similarity between current clusters as new level features
+		//save average distance between current clusters as new level features
 		Mat C_new = Mat::zeros(centers.rows, centers.rows, CV_32FC1);
 		for(int i = 0; i < centers.rows; i++)
 			for(int j = i+1; j < centers.rows; j++)
@@ -657,6 +793,266 @@ int HiCluster :: cluster(string workDir, vector<string> featureType)
 		return ERR_CFG_CLUSTER_INVALID;
 	}
 
+	return 0;
+}
+
+int HiCluster::getHiClusterAllFromGTEA(vector<vector<FeatureInfo> > featureInfo)
+{
+	Dataset db = dataset_setup("GTEA");
+	string database = db.getDatasetName();
+	stringstream ss;
+
+	//calculate distance matrix
+	int num_sample = (int)featureInfo[0].size();
+	Mat distM = Mat::zeros(num_sample, num_sample, CV_32FC1);
+	for(int i = 0; i < num_sample; i++)
+		for(int j = i+1; j < num_sample; j++)
+		{
+			//calculate distance of two samples
+			distM.at<float>(i,j) = calcDissimilarity(featureInfo[0][i], featureInfo[0][j], _feature_set, _weight_set);
+		}
+	for(int i = 0; i < num_sample; i++)
+		for(int j = 0; j < i; j++)
+			distM.at<float>(i,j) = distM.at<float>(j,i);
+
+	//top directory for saving clustering results	
+	
+	char dirName[500];
+	sprintf(dirName, "%s", "all");
+	for(int i = 0; i < (int)_feature_set.size(); i++)
+		sprintf(dirName, "%s_%s%d", dirName, _feature_set[i].c_str(), (int)(_weight_set[i]*100));
+	string fDir(dirName);
+
+	ss.str("");
+	ss << "mkdir /home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/";
+	cout << ss.str() << endl;
+	system(ss.str().c_str());
+	
+	//hierarchical clustering levels, with 1/2 convergence rate
+	int baselevelSize = distM.rows;
+	int totalLevel = floor( log2(baselevelSize) );
+	Mat prev_label(baselevelSize, 1, CV_32S); //clustering result of lower level
+	for(int i = 0; i < prev_label.rows; i++)
+		prev_label.at<int>(i,0) = i;
+	for(int lev = 1; lev < totalLevel; lev++)
+	{
+		//spectral clustering
+		int k = baselevelSize >> lev;
+		Mat labels, centers;
+		getSpectralCluster(distM, k, labels, centers);
+
+		//restore cluster relationship of current level
+		vector<vector<int> > clusterTree(centers.rows);
+		for(int m = 0; m < labels.rows; m++)
+		{
+			clusterTree[labels.at<int>(m, 0)].push_back(m);
+		}
+
+		//save average distance between current clusters as new distance matrix
+		Mat C_new = Mat::zeros(centers.rows, centers.rows, CV_32FC1);
+		for(int i = 0; i < centers.rows; i++)
+			for(int j = i+1; j < centers.rows; j++)
+			{
+				float sum_cost = 0;
+				for(int m = 0; m < (int)clusterTree[i].size(); m++)
+					for(int l = 0; l < (int)clusterTree[j].size(); l++)
+						sum_cost += distM.at<float>(clusterTree[i][m], clusterTree[j][l]);
+				C_new.at<float>(i, j) = sum_cost / (int)clusterTree[i].size() / (int)clusterTree[j].size();
+			}
+		for(int i = 0; i < C_new.rows; i++)
+			for(int j = 0; j < i; j++)
+				C_new.at<float>(i, j) = C_new.at<float>(j, i);
+		distM = C_new;
+
+		//save result		
+		ss.str("");
+		ss << "rm -r /home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters";
+		cout << ss.str() << endl;
+		system(ss.str().c_str());
+		
+		ss.str("");
+		ss << "mkdir /home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters";
+		cout << ss.str() << endl;
+		system(ss.str().c_str());
+
+		ss.str("");
+		ss << "/home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters/log.txt";
+		ofstream outfile(ss.str().c_str(), ios::out);
+		vector<int> label_count(k, 0);
+		for(int i = 0; i < baselevelSize; i++)
+		{
+			int label_v = labels.at<int>(prev_label.at<int>(i,0), 0);
+			ss.str("");
+	        ss << featureInfo[0][i].seqNum << "\t" << featureInfo[0][i].frameNum << "\t";
+	        ss << "(" << featureInfo[0][i].box.x << "," << featureInfo[0][i].box.y << "," << featureInfo[0][i].box.width << "," << featureInfo[0][i].box.height << ")\t";
+			ss << label_v << endl;
+	        outfile << ss.str();
+
+			ss.str("");
+			ss << "/home/cai-mj/_GTA/img/" + db.getSequence(featureInfo[0][i].seqNum).seqName+ "/" << setw(8) << setfill('0') << featureInfo[0][i].frameNum << ".jpg";
+			Mat img = imread(ss.str());
+			img = img(featureInfo[0][i].box).clone();
+			ss.str("");
+			ss << "/home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters/" << label_v << "_" << label_count[label_v] << ".jpg";
+			imwrite(ss.str(), img);
+
+			label_count[label_v]++;
+			prev_label.at<int>(i,0) = label_v;
+		}
+		outfile.close();
+	}
+	
+	return 0;
+}
+
+int HiCluster::getClusterAllFromIntel(vector<vector<FeatureInfo> > featureInfo)
+{
+	Dataset db = dataset_setup("Intel");
+	string database = db.getDatasetName();
+	stringstream ss;
+	
+	//calculate distance matrix
+	int num_sample = (int)featureInfo[0].size();
+	Mat distM = Mat::zeros(num_sample, num_sample, CV_32FC1);
+	for(int i = 0; i < num_sample; i++)
+		for(int j = i+1; j < num_sample; j++)
+		{
+			//calculate distance of two samples
+			distM.at<float>(i,j) = calcDissimilarity(featureInfo[0][i], featureInfo[0][j], _feature_set, _weight_set);
+		}
+	for(int i = 0; i < num_sample; i++)
+		for(int j = 0; j < i; j++)
+			distM.at<float>(i,j) = distM.at<float>(j,i);
+
+	//spectral clustering
+	int k = INTEL_OBJECT_SIZE;
+	Mat labels, centers;
+	getSpectralCluster(distM, k, labels, centers);
+	
+	//save results
+	char dirName[500];
+	sprintf(dirName, "%s", "all");
+	for(int i = 0; i < (int)_feature_set.size(); i++)
+		sprintf(dirName, "%s_%s%d", dirName, _feature_set[i].c_str(), (int)(_weight_set[i]*100));
+	string fDir(dirName);
+	
+	ss.str("");
+	ss << "mkdir /home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/";
+	cout << ss.str() << endl;
+	system(ss.str().c_str());
+	
+	ss.str("");
+	ss << "rm -r /home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters";
+	cout << ss.str() << endl;
+	system(ss.str().c_str());
+	
+	ss.str("");
+	ss << "mkdir /home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters";
+	cout << ss.str() << endl;
+	system(ss.str().c_str());
+
+	ss.str("");
+	ss << "/home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters/log.txt";
+	ofstream outfile(ss.str().c_str(), ios::out);
+	vector<int> label_count(k, 0);
+	for(int i = 0; i < labels.rows; i++)
+	{
+		int label_v = labels.at<int>(i,0);
+		ss.str("");
+        ss << featureInfo[0][i].seqNum << "\t" << featureInfo[0][i].frameNum << "\t";
+        ss << "(" << featureInfo[0][i].box.x << "," << featureInfo[0][i].box.y << "," << featureInfo[0][i].box.width << "," << featureInfo[0][i].box.height << ")\t";
+		ss << label_v << endl;
+        outfile << ss.str();
+
+		ss.str("");
+		ss << "/home/cai-mj/_GTA/img/" + db.getSequence(featureInfo[0][i].seqNum).seqName+ "/" << setw(10) << setfill('0') << featureInfo[0][i].frameNum << ".jpg";
+		Mat img = imread(ss.str());
+		img = img(featureInfo[0][i].box).clone();
+		ss.str("");
+		ss << "/home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters/" << label_v << "_" << label_count[label_v] << ".jpg";
+		imwrite(ss.str(), img);
+
+		label_count[label_v]++;
+	}
+	outfile.close();
+	return 0;
+}
+
+int HiCluster::getClusterFromIntel(vector<vector<FeatureInfo> > featureInfo)
+{
+	Dataset db = dataset_setup("Intel");
+	string database = db.getDatasetName();
+	stringstream ss;
+
+	for(int oid = 0; oid < (int)featureInfo.size(); oid++)
+	{
+		//calculate distance matrix
+		int num_sample = (int)featureInfo[oid].size();
+		Mat distM = Mat::zeros(num_sample, num_sample, CV_32FC1);
+		for(int i = 0; i < num_sample; i++)
+	        for(int j = i+1; j < num_sample; j++)
+	        {
+	        	//calculate distance of two samples
+	        	distM.at<float>(i,j) = calcDissimilarity(featureInfo[0][i], featureInfo[0][j], _feature_set, _weight_set);
+	        }
+	    for(int i = 0; i < num_sample; i++)
+	        for(int j = 0; j < i; j++)
+	            distM.at<float>(i,j) = distM.at<float>(j,i);
+
+		//try different cluster number K without any prior knowledge of ground truth
+		for(int k = 2; k <= 10; k++)
+		{
+			//spectral clustering
+			Mat labels, centers;
+			getSpectralCluster(distM, k, labels, centers);
+			
+			//save results
+			string fDir = "object-" + to_string(oid+1);
+			for(int i = 0; i < (int)_feature_set.size(); i++)
+				fDir = fDir + "_" + _feature_set[i] + to_string((int)(_weight_set[i]*100));
+			
+			ss.str("");
+			ss << "mkdir /home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/";
+			cout << ss.str() << endl;
+			system(ss.str().c_str());
+			
+			ss.str("");
+			ss << "rm -r /home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters";
+			cout << ss.str() << endl;
+			system(ss.str().c_str());
+			
+			ss.str("");
+			ss << "mkdir /home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters";
+			cout << ss.str() << endl;
+			system(ss.str().c_str());
+
+			ss.str("");
+			ss << "/home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters/log.txt";
+			ofstream outfile(ss.str().c_str(), ios::out);
+			vector<int> label_count(k, 0);
+			for(int i = 0; i < labels.rows; i++)
+			{
+				int label_v = labels.at<int>(i,0);
+				ss.str("");
+	            ss << featureInfo[oid][i].seqNum << "\t" << featureInfo[oid][i].frameNum << "\t";
+	            ss << "(" << featureInfo[oid][i].box.x << "," << featureInfo[oid][i].box.y << "," << featureInfo[oid][i].box.width << "," << featureInfo[oid][i].box.height << ")\t";
+				ss << label_v << endl;
+	            outfile << ss.str();
+
+				ss.str("");
+				ss << "/home/cai-mj/_GTA/img/" + db.getSequence(featureInfo[oid][i].seqNum).seqName+ "/" << setw(10) << setfill('0') << featureInfo[oid][i].frameNum << ".jpg";
+				Mat img = imread(ss.str());
+				img = img(featureInfo[oid][i].box).clone();
+				ss.str("");
+				ss << "/home/cai-mj/_GTA/grasp/" + database + "/version" << _version << "/" + fDir + "/" << k << "-clusters/" << label_v << "_" << label_count[label_v] << ".jpg";
+				imwrite(ss.str(), img);
+
+				label_count[label_v]++;
+			}
+			outfile.close();
+		}
+		cout << "finish clustering for objectid " << oid+1 << endl;
+	}
 	return 0;
 }
 

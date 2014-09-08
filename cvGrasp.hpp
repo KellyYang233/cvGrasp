@@ -23,6 +23,8 @@
 #include "DataPreparation.hpp"
 #include "FeatureExtractor.hpp"
 #include "HiCluster.hpp"
+#include "Classifier.hpp"
+
 using namespace std;
 using namespace cv;
 
@@ -43,7 +45,22 @@ public:
 	int computeFeature();
 	int hierarchyCluster();
 	int procIntelGrasp();
+	int procGTEAGrasp();
+	int procYaleGraspClassify();	
+	
 private:
+	int trainDataGraspClassifier_interval(Dataset &db, int version, string seqName, Grasp &grasp, vector<TrackInfo> &tracks, Mat &data, vector<GraspNode> &nodes);
+	int trainDataGraspClassifier(string datasetName, int version, Grasp grasp, vector<Grasp> freqGrasps, Mat &trainData, Mat &labels, vector<GraspNode> &trainNodes);
+	template<class T>
+	vector<T> trainGraspClassifiers(string datasetName, int version, vector<Grasp> freqGrasps);
+	int testDataGraspClassifier_interval(Dataset &db, int version, string seqName, Grasp &grasp, vector<TrackInfo> &tracks, Mat &data, vector<GraspNode> &nodes);
+	template<class T>
+	pair<Mat, Mat> testGraspClassifier(string datasetName, int version, vector<T> trainers, vector<Grasp> freqGrasps);
+	
 };
+
+Mat getHOGClusters(Dataset &db, int version, int clusterNum);
+Rect getBox_fixed(RotatedRect rRect, Mat &img);
+Rect getBox_object(Rect handroi, Mat &img);
 
 #endif

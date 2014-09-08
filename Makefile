@@ -20,7 +20,7 @@ CC := g++
 C_REGULAR_NOT_CPP_BECAUSE_THE_ABOVE_IS_NAMED_CC := cc
 
 # define any compile-time flags
-CFLAGS := -g -Wall
+CFLAGS := -g -Wall -ggdb3 -std=c++0x
 
 # define any directories containing header files other than /usr/include
 INCLUDES := -I. -I/usr/local/include/
@@ -31,7 +31,7 @@ INCLUDES := -I. -I/usr/local/include/
 LFLAGS :=  -L. -Wl,-rpath=/usr/local/lib/ -L/usr/local/lib/
 
 # define any libraries to link into executable:
-LIBS := -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_ml -lopencv_video -lopencv_features2d -lopencv_calib3d -lopencv_objdetect -lopencv_contrib -lopencv_legacy -lopencv_flann -lopencv_nonfree
+LIBS := -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_ml -lopencv_video -lopencv_features2d -lopencv_calib3d -lopencv_objdetect -lopencv_contrib -lopencv_legacy -lopencv_flann -lopencv_nonfree -lopencv_gpu
 
 # define project directories
 PROJDIRS := .
@@ -43,7 +43,7 @@ BUILDDIR := .
 #CXXSRC := $(shell find $(PROJDIRS) -mindepth 1 -maxdepth 3 -name "*.cpp")
 #CSRC := $(shell find $(PROJDIRS) -mindepth 1 -maxdepth 3 -name "*.c") 
 
-CXXSRC := commonUse.cpp Skeleton.cpp cvGrasp.cpp DataPreparation.cpp FeatureExtractor.cpp HiCluster.cpp
+CXXSRC := commonUse.cpp Skeleton.cpp DataPreparation.cpp FeatureExtractor.cpp HiCluster.cpp Classifier.cpp cvGrasp.cpp
 
 # define the C object files 
 OBJS := $(CXXSRC:.cpp=.o)
