@@ -1,12 +1,13 @@
 Hand grasp recognition from first-person videos
 This code project is a mix of multiple tasks (classification and clustering) which may cause confusion to you.
-For classfication, please focus on the function in cvGrasp.cpp
+For classfication, please focus on the procedure in function cvGrasp::procYaleGraspClassify() in cvGrasp.cpp.
+Sorry for the inconvenience. 
 
 Please cite the following paper if the code helps you:
 @inproceedings{cai2015scalable,
   title={A scalable approach for understanding the visual structures of hand grasps},
   author={Cai, Minjie and Kitani, Kris M and Sato, Yoichi},
-  booktitle={Robotics and Automation (ICRA), 2015 IEEE International Conference on},
+  booktitle={Proceedings of IEEE International Conference on Robotics and Automation (ICRA)},
   pages={1360--1366},
   year={2015},
   organization={IEEE}
