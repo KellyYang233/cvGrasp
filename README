@@ -4,6 +4,11 @@ For classfication, please focus on the procedure in function cvGrasp::procYaleGr
 Sorry for the inconvenience. 
 
 Please cite the following paper if the code helps you:
-
-Cai, M., Kitani, K.M. and Sato, Y., 2015, May. A scalable approach for understanding the visual structures of hand grasps. 
-In Robotics and Automation (ICRA), 2015 IEEE International Conference on (pp. 1360-1366). IEEE.
+@inproceedings{cai2015scalable,
+  title={A scalable approach for understanding the visual structures of hand grasps},
+  author={Cai, Minjie and Kitani, Kris M and Sato, Yoichi},
+  booktitle={Robotics and Automation (ICRA), 2015 IEEE International Conference on},
+  pages={1360--1366},
+  year={2015},
+  organization={IEEE}
+}
